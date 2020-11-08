@@ -13,19 +13,7 @@ public class VerletSimulator : MonoBehaviour
     private List<VerletNode> Nodes = null;
 
     [SerializeField]
-    private Transform PinPoint = null;
-
-    [SerializeField]
-    private Transform PinPoint2 = null;
-
-    [SerializeField]
-    private Transform PinPoint3 = null;
-
-    [SerializeField]
-    private Transform PinPoint4 = null;
-
-    [SerializeField]
-    private Transform PinPoint5 = null;
+    private List<Transform> PinPoints = null;
 
     [SerializeField]
     private Vector3 StartPosition = Vector3.zero;
@@ -45,31 +33,15 @@ public class VerletSimulator : MonoBehaviour
     [SerializeField]
     private float DistanceLimitation = 1f;
 
-    [SerializeField]
-    private Transform ConstraintTarget = null;
-
-    private int WIDTH = 5;
-    private int HEIGHT = 5;
+    private int WIDTH = 20;
+    private int HEIGHT = 20;
 
     void Start()
     {
         Init();
     }
 
-    private void InitOrigin()
-    {
-        StartPosition = PinPoint.position;
-        foreach (var node in Nodes)
-        {
-            node.transform.SetParent(null);
-            node.transform.position = StartPosition;
-            node.PrevPos = StartPosition;
 
-            StartPosition.y -= Distance;
-        }
-
-        PrevObjPos = this.transform.position;
-    }
 
     private VerletNode GetNode(int index)
     {
@@ -91,7 +63,7 @@ public class VerletSimulator : MonoBehaviour
     private void Init()
     {
 
-        StartPosition = PinPoint.position;
+        StartPosition = PinPoints[0].position;
 
         for (int i = 0; i < HEIGHT; ++i)
         {
@@ -139,11 +111,11 @@ public class VerletSimulator : MonoBehaviour
 
         PrevObjPos = this.transform.position;
 
-        Nodes[0].PinPoint = PinPoint;
-        Nodes[1].PinPoint = PinPoint2;
-        Nodes[2].PinPoint = PinPoint3;
-        Nodes[3].PinPoint = PinPoint4;
-        Nodes[4].PinPoint = PinPoint5;
+        Nodes[GetIndex(0, 0)].PinPoint = PinPoints[0];
+        Nodes[GetIndex(0, HEIGHT- 1)].PinPoint = PinPoints[1];
+        Nodes[GetIndex(WIDTH - 1, 0)].PinPoint = PinPoints[2];
+        Nodes[GetIndex(WIDTH - 1, HEIGHT -1 )].PinPoint = PinPoints[3];
+
 
     }
 
@@ -181,12 +153,6 @@ public class VerletSimulator : MonoBehaviour
 
             Vector3 dir = node.transform.position - newPos;
 
-            if (ConstraintTarget != null)
-            {
-                if (newPos.y < ConstraintTarget.position.y)
-                    newPos.y = ConstraintTarget.position.y;
-            }
-
             node.transform.position = newPos;
         }
     }
@@ -214,51 +180,22 @@ public class VerletSimulator : MonoBehaviour
 
     private void ApplyConstraint()
     {
-
-        for (int i = 0; i < WIDTH; ++i)
-        {
-            Nodes[i].transform.position = PinPoint.position + new Vector3(i,0,0);
-        }
-
-        
-
         var nodeCount = Nodes.Count;
         for (int i = 0; i < nodeCount; ++i)
         {
-
             var node = Nodes[i];
             if (node.PinPoint != null)
-            {
                 node.transform.position = node.PinPoint.position;
-                continue;
-            }
 
             foreach (var adj in node.Nodes)
-            {
                 Calculate(node, adj);
-            }
-
-            
-            //var node1 = Nodes[i];
-            //var node2 = Nodes[i + 1];
-
-            //float curDistance = (node1.transform.position - node2.transform.position).magnitude;
-            //float diff = Mathf.Abs(curDistance - Distance);
-
-            //var dir = Vector3.zero;
-
-            //if (curDistance > Distance)
-            //    dir = (node1.transform.position - node2.transform.position).normalized;
-            //else if (curDistance < Distance)
-            //    dir = (node2.transform.position - node1.transform.position).normalized;
-
-
-            //Vector3 movement = dir * diff;
-
-            //node1.transform.position -= (movement * Movement);
-            //node2.transform.position += (movement * Movement);
         }
 
+    }
+
+    public void RemovePinPoint()
+    {
+        Nodes.ForEach(v => v.PinPoint = null);
     }
 
 
@@ -278,16 +215,14 @@ public class VerletSimulator : MonoBehaviour
                     var node = Nodes[j];
 
                     var newPos = node.transform.position;
-
-                    if (ConstraintTarget != null)
-                    {
-                        if (newPos.y < ConstraintTarget.position.y)
-                            newPos.y = ConstraintTarget.position.y;
-                    }
-
                     node.transform.position = newPos;
                 }
             }
+        }
+
+        if (Input.GetKeyDown(KeyCode.A))
+        {
+            RemovePinPoint();
         }
 
     }
@@ -302,6 +237,11 @@ public class VerletSimulator : MonoBehaviour
                 Gizmos.DrawLine(node.transform.position, n.transform.position);
             }
         }
+
+        
     }
+
+    
+
 
 }
