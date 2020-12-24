@@ -1,0 +1,60 @@
+#pragma kernel ValidateDistance
+#pragma kernel Simulate
+
+#define BLOCK_SIZE 256
+#define NODE_IDJ_COUNT 4
+
+struct NodeData
+{
+    float3 PrevPos;
+    float3 CurPos;
+
+    int Node0;
+    int Node1;
+    int Node2;
+    int Node3;
+};
+
+RWStructuredBuffer<NodeData> NodeDatas;
+
+RWStructuredBuffer<float3> PositionsWrite;
+
+float DeltaTime;
+
+[numthreads(BLOCK_SIZE, 1, 1)]
+void ValidateDistance(
+    uint3 DispatchThreadID : SV_DispatchThreadID,
+    uint3 GroupID : SV_GroupID,
+    uint3 GroupThreadID : SV_GroupThreadID,
+    uint GroupIndex : SV_GroupIndex)
+{
+    const unsigned int id = DispatchThreadID.x;
+
+    float3 position = PositionsWrite[id];
+    
+    PositionsWrite[id] = float3(1, 1, 1);
+
+}
+
+[numthreads(BLOCK_SIZE, 1, 1)]
+void Simulate(
+    uint3 DispatchThreadID : SV_DispatchThreadID,
+    uint3 GroupID : SV_GroupID,
+    uint3 GroupThreadID : SV_GroupThreadID,
+    uint GroupIndex : SV_GroupIndex)
+{
+    const unsigned int id = DispatchThreadID.x;
+
+    float3 curPos = PositionsWrite[id];
+    
+    NodeData nodeData = NodeDatas[id];
+    float3 velocity = nodeData.CurPos - nodeData.PrevPos;
+    //nodeData.PrevPos = node.CurPos;
+
+    float3 newPos = nodeData.CurPos + velocity;
+    
+    //nodeData.CurPos = newPos;
+    NodeDatas[id].CurPos = float3(9, 1, 1);
+    PositionsWrite[id] = newPos;
+}
+

@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Runtime.InteropServices;
 
 public class VerletSimulator : MonoBehaviour 
 {
@@ -33,12 +34,18 @@ public class VerletSimulator : MonoBehaviour
     [SerializeField]
     private float DistanceLimitation = 1f;
 
+    [SerializeField]
+    private bool ApplyGPU = false;
+
     private int WIDTH = 20;
     private int HEIGHT = 20;
 
     void Start()
     {
         Init();
+
+        if(ApplyGPU == true)
+            InitBuffer();
     }
 
 
@@ -78,30 +85,46 @@ public class VerletSimulator : MonoBehaviour
 
                 if (j != 0)
                 {
-                    var left = GetNode(GetIndex(j-1,i));
+                    var idx = GetIndex(j - 1, i);
+                    var left = GetNode(idx);
                     if (left != null)
+                    {
                         node.Nodes.Add(left);
+                        node.NodeIndices.Add(idx);
+                    }
                 }
 
                 if (i != 0)
                 {
+                    var idx = GetIndex(j, i - 1);
                     var up = GetNode(GetIndex(j, i - 1));
                     if (up != null)
+                    {
                         node.Nodes.Add(up);
+                        node.NodeIndices.Add(idx);
+                    }
                 }
 
                 if (i != WIDTH)
                 {
-                    var right = GetNode(GetIndex(j + 1, i));
+                    var idx = GetIndex(j + 1, i);
+                    var right = GetNode(idx);
                     if (right != null)
+                    {
                         node.Nodes.Add(right);
+                        node.NodeIndices.Add(idx);
+                    }
                 }
 
                 if (j != HEIGHT)
                 {
-                    var down = GetNode(GetIndex(j, i +1));
+                    var idx = GetIndex(j, i + 1);
+                    var down = GetNode(idx);
                     if (down != null)
+                    {
                         node.Nodes.Add(down);
+                        node.NodeIndices.Add(idx);
+                    }
                 }
 
 
@@ -123,8 +146,6 @@ public class VerletSimulator : MonoBehaviour
     Vector3 PrevObjPos = Vector3.zero;
     private void ValidateDistance()
     {
-        var curPos = transform.position;
-
         var dist = transform.position - PrevObjPos;
         if (dist.magnitude > DistanceLimitation)
         {
@@ -198,10 +219,19 @@ public class VerletSimulator : MonoBehaviour
         Nodes.ForEach(v => v.PinPoint = null);
     }
 
-
-    void Update()
+    private void Update()
     {
-        ValidateDistance();
+        if(ApplyGPU == false)
+            UpdateCPU();
+        else
+            UpdateGPU();
+    }
+
+
+
+    private void UpdateCPU()
+    {
+        //ValidateDistance();
         Simulate();
 
         for (int i = 0; i < IterationCount; ++i)
@@ -223,6 +253,86 @@ public class VerletSimulator : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.A))
         {
             RemovePinPoint();
+        }
+
+    }
+
+
+    ////////////////////////// GPU
+
+
+    [Serializable]
+    public struct NodeData
+    {
+        public Vector3 PrevPos;
+        public Vector3 CurPos;
+
+        public int Node0;
+        public int Node1;
+        public int Node2;
+        public int Node3;
+    }
+
+    [SerializeField]
+    private ComputeShader CShader;
+
+    private const int BLOCK_SIZE = 256;
+    private const int MAX_OBJECT_COUNT = 400;
+
+
+    private NodeData[] NodeDatas;
+    private ComputeBuffer NodeDataBuffer;
+
+    private void InitBuffer()
+    {
+        NodeDataBuffer = new ComputeBuffer(MAX_OBJECT_COUNT, Marshal.SizeOf(typeof(NodeData)));
+        NodeDatas = new NodeData[MAX_OBJECT_COUNT];
+        for (int i = 0; i < Nodes.Count; ++i)
+        {
+            var node = Nodes[i];
+            var data = new NodeData();
+            data.CurPos = node.transform.position;
+            data.PrevPos = node.transform.position;
+
+            if (node.NodeIndices.Count > 1)
+                data.Node0 = node.NodeIndices[0];
+
+            if (node.NodeIndices.Count > 2)
+                data.Node1 = node.NodeIndices[1];
+
+            if (node.NodeIndices.Count > 3)
+                data.Node2 = node.NodeIndices[2];
+
+            if (node.NodeIndices.Count > 4)
+                data.Node3 = node.NodeIndices[3];
+
+            NodeDatas[i] = data;
+        }
+        NodeDataBuffer.SetData(NodeDatas);
+
+    }
+    private void UpdateGPU()
+    {
+        List<Vector3> positions = new List<Vector3>();
+        foreach (var node in Nodes)
+        {
+            positions.Add(node.transform.position);
+        }
+
+        ComputeShader cs = CShader;
+
+        int threadGroupSize = Nodes.Count / BLOCK_SIZE;
+
+        var kernel = cs.FindKernel("Simulate");
+        cs.SetBuffer(kernel, "NodeDatas", NodeDataBuffer);
+        cs.Dispatch(kernel, threadGroupSize, 1, 1);
+
+        var nodedatas = new NodeData[MAX_OBJECT_COUNT];
+        NodeDataBuffer.GetData(nodedatas);
+
+        for (int i = 0; i < nodedatas.Length; ++i)
+        {
+            Nodes[i].transform.position = nodedatas[i].CurPos;
         }
 
     }

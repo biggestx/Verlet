@@ -9,5 +9,5 @@ public class VerletNode : MonoBehaviour
     public Transform PinPoint;
 
     public List<VerletNode> Nodes = new List<VerletNode>();
-
+    public List<int> NodeIndices = new List<int>();
 }
