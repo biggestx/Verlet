@@ -1,5 +1,5 @@
-#pragma kernel ValidateDistance
 #pragma kernel Simulate
+#pragma kernel ApplyConstraint
 
 #define BLOCK_SIZE 256
 #define NODE_IDJ_COUNT 4
@@ -9,6 +9,9 @@ struct NodeData
     float3 PrevPos;
     float3 CurPos;
 
+    int HasPinPoint;
+    float3 PinPoint;
+
     int Node0;
     int Node1;
     int Node2;
@@ -17,24 +20,12 @@ struct NodeData
 
 RWStructuredBuffer<NodeData> NodeDatas;
 
-RWStructuredBuffer<float3> PositionsWrite;
-
 float DeltaTime;
-
-[numthreads(BLOCK_SIZE, 1, 1)]
-void ValidateDistance(
-    uint3 DispatchThreadID : SV_DispatchThreadID,
-    uint3 GroupID : SV_GroupID,
-    uint3 GroupThreadID : SV_GroupThreadID,
-    uint GroupIndex : SV_GroupIndex)
-{
-    const unsigned int id = DispatchThreadID.x;
-
-    float3 position = PositionsWrite[id];
-    
-    PositionsWrite[id] = float3(1, 1, 1);
-
-}
+int NodeCount;
+float Distance;
+float Movement;
+float3 Gravity;
+int IterationCount;
 
 [numthreads(BLOCK_SIZE, 1, 1)]
 void Simulate(
@@ -45,16 +36,113 @@ void Simulate(
 {
     const unsigned int id = DispatchThreadID.x;
 
-    float3 curPos = PositionsWrite[id];
-    
-    NodeData nodeData = NodeDatas[id];
-    float3 velocity = nodeData.CurPos - nodeData.PrevPos;
-    //nodeData.PrevPos = node.CurPos;
+    float3 velocity = NodeDatas[id].CurPos - NodeDatas[id].PrevPos;
+    NodeDatas[id].PrevPos = NodeDatas[id].CurPos;
 
-    float3 newPos = nodeData.CurPos + velocity;
-    
-    //nodeData.CurPos = newPos;
-    NodeDatas[id].CurPos = float3(9, 1, 1);
-    PositionsWrite[id] = newPos;
+    float3 newPos = NodeDatas[id].CurPos + velocity;
+    newPos += (Gravity * DeltaTime);
+
+    NodeDatas[id].CurPos = newPos;
 }
+
+//private void ApplyConstraint()
+//{
+//    var nodeCount = Nodes.Count;
+//    for (int i = 0; i < nodeCount; ++i)
+//    {
+//        var node = Nodes[i];
+//        if (node.PinPoint != null)
+//            node.transform.position = node.PinPoint.position;
+//
+//        foreach(var adj in node.Nodes)
+//            Calculate(node, adj);
+//    }
+//
+//}
+//
+//private void Calculate(VerletNode a, VerletNode b)
+//{
+//    var node1 = a;
+//    var node2 = b;
+//
+//    float curDistance = (node1.transform.position - node2.transform.position).magnitude;
+//    float diff = Mathf.Abs(curDistance - Distance);
+//
+//    var dir = Vector3.zero;
+//
+//    if (curDistance > Distance)
+//        dir = (node1.transform.position - node2.transform.position).normalized;
+//    else if (curDistance < Distance)
+//        dir = (node2.transform.position - node1.transform.position).normalized;
+//
+//    Vector3 movement = dir * diff;
+//
+//    node1.transform.position -= (movement * Movement);
+//    node2.transform.position += (movement * Movement);
+//}
+
+void Calculate(int idx1,int idx2)
+{
+    NodeData node1 = NodeDatas[idx1];
+    NodeData node2 = NodeDatas[idx2];
+
+    float curDistance = length(node1.CurPos - node2.CurPos);
+    float diff = abs(curDistance - Distance);
+
+    float3 dir = float3(0, 0, 0);
+
+    if (curDistance > Distance)
+        dir = normalize(node1.CurPos - node2.CurPos);
+    else if (curDistance < Distance)
+        dir = normalize(node2.CurPos - node1.CurPos);
+
+    float3 movement = dir * diff;
+
+    /*NodeDatas[idx1].CurPos -= (movement * Movement);
+    NodeDatas[idx2].CurPos += (movement * Movement);*/
+
+    NodeDatas[idx1].CurPos -= node1.CurPos - node2.CurPos;
+    //NodeDatas[idx2].CurPos += float3(curDistance, curDistance, curDistance);
+
+
+}
+
+[numthreads(BLOCK_SIZE, 1, 1)]
+void ApplyConstraint(
+    uint3 DispatchThreadID : SV_DispatchThreadID,
+    uint3 GroupID : SV_GroupID,
+    uint3 GroupThreadID : SV_GroupThreadID,
+    uint GroupIndex : SV_GroupIndex)
+{
+    const unsigned int id = DispatchThreadID.x;
+
+    NodeData node = NodeDatas[id];
+
+    if (node.HasPinPoint == 1)
+        NodeDatas[id].CurPos = node.PinPoint;
+
+
+    if (node.Node0 > -1)
+    {
+        Calculate(id, node.Node0);
+    }
+
+    if (node.Node1 > -1)
+    {
+        Calculate(id, node.Node1);
+    }
+
+    if (node.Node2 > -1)
+    {
+        Calculate(id, node.Node2);
+    }
+
+    if (node.Node3 > -1)
+    {
+        Calculate(id, node.Node3);
+    }
+
+}
+
+
 
