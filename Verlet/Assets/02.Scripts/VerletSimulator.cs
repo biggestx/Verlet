@@ -12,7 +12,6 @@ public class VerletSimulator : MonoBehaviour
         kGPU,
     }
 
-
     private VerletCPU Cpu = null;
     private VerletGPU Gpu = null;
 
@@ -60,7 +59,6 @@ public class VerletSimulator : MonoBehaviour
     {
         return HEIGHT * y + x;
     }
-
 
     private void Init()
     {
@@ -141,19 +139,12 @@ public class VerletSimulator : MonoBehaviour
     }
 
 
-
-
     private void Update()
     {
         if (TargetVerlet != null)
             TargetVerlet.UpdateVerlet();
 
     }
-
-
-
-
-    ////////////////////////// GPU
 
 
     void OnDrawGizmos()
