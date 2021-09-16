@@ -11,7 +11,7 @@ Language
     - C#
     - Compute Shader
 
-Details
+Features
 ----
     - Verlet Algorithm
     - Sphere Collision
